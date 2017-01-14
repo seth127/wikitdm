@@ -27,7 +27,7 @@ def rawToTokenList(rawData):
         try:
             #tokenList.append(str(token))
             #tokenList.append(unicode(token)) #### changed this to get rid of most CODEC ERRORs
-            thisToken = unicode(token)
+            thisToken = token
             uselessUnicode = [u'\u2013', u'\u2014', u'\u201d', u'\u201c'] ### don't include these when they are alone
             if thisToken not in uselessUnicode:
                 thisToken = thisToken.replace(u'\u201d','') # delete this (unicode quote)
@@ -97,7 +97,8 @@ class lingualObject(object):
         self.tokens={}
 
         #Extract raw text and update for encoding issues            
-        rawData=unicode(open(fileName).read(), "utf-8", errors="ignore")
+        #rawData=unicode(open(fileName).read(), "utf-8", errors="ignore")
+        rawData = open(fileName, encoding="utf-8", errors='ignore').read()
 
         # tokenize and stem
         tokenList = rawToTokenList(rawData)
@@ -111,9 +112,6 @@ class lingualObject(object):
     def getKeywords(self, wordCount):
         startCount = 0
         # get all tokens for the fileName
-        #all_words = []
-        #for toke in self.tokens.values():
-        #    all_words = all_words + toke
         all_words = self.tokens
 
 
@@ -161,27 +159,41 @@ class lingualObject(object):
     def wikitfidf(self, log = True):
         startCount = 0
         # get all tokens for the fileName
-        #all_words = []
-        #for toke in self.tokens.values():
-        #    all_words = all_words + toke
         all_words = self.tokens
 
 
         ## create FreqDF with word frequencies from fileName
         freq = FreqDist(all_words) 
+
+        '''
+        print(freq)
+        print(type(freq))
+        #print(freq.items()[0])
+        #print(type(freq.items()))
         columns_obj = ["term", "freq"]
         freqDF = pd.DataFrame(freq.items(), columns=columns_obj) # convert it to a data frame
         #freqDF = freqDF.set_index('term')
 
-        ## drop the pronouns
         terms = freqDF['term'].values.tolist()
         
-        #if noPro = T:
+        ## drop the pronouns
+        #if noPro = True:
             #keepers = drop_pronouns(terms[1:])
         #else:
         keepers = terms
         freqDF = freqDF.set_index('term')
         freqDF = freqDF.ix[keepers]
+        '''
+
+        # convert it to a data frame
+        freqDF = pd.DataFrame.from_dict(freq, orient='index')
+        freqDF.columns = ['freq']
+
+        ## drop the pronouns
+        #if noPro = True:
+            #terms = df.index.tolist()
+            #keepers = drop_pronouns(terms)
+            #freqDF = freqDF.ix[keepers]
         
         ## merge freqDF with idf data frame
         freqit = freqDF.join(self.idf[['idf', 'logidf']])
@@ -198,17 +210,7 @@ class lingualObject(object):
         ## order by tfidf weight
         freqit = freqit.sort_values(by='tfidf', ascending=False) 
 
-        '''
-        #filter out codecerror
-        keyslist = freqit.iloc[startCount:wordCount+startCount].index.tolist()
-        keywords = []
-        for word in keyslist:
-            if (word != 'codecerror') & (word != ''):
-                keywords = keywords + [word]
-
-        ##
-        self.keywords = keywords
-        '''
+        # select raw IDF or log(IDF) for multiplier
         if log == True:
             #print(freqit[['logidf']])
             return freqit[['logtfidf']]
@@ -255,6 +257,7 @@ def wikidtm(textDir, log = True, saveToCsv = True):
     # write to csv file
     if saveToCsv == True:
         df.to_csv(textDir + '-wikiTFIDF.csv', encoding='utf-8')
+
         print('$$$$$$\nFULL TDM SAVED AS ' + textDir + '-wikiTFIDF.csv' + '\n$$$$$$')
     #
     print('$$$$$$\nFINISHED! :: ' + str(df.shape[1]) + ' documents and ' + str(df.shape[0]) + ' terms\n$$$$$$')
