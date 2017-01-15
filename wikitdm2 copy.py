@@ -25,7 +25,9 @@ def rawToTokenList(rawData):
     tokenList=[]
     for token in textList:
         try:
-            thisToken = token
+            #tokenList.append(str(token))
+            #tokenList.append(unicode(token)) #### changed this to get rid of most CODEC ERRORs
+            thisToken = unicode(token)
             uselessUnicode = [u'\u2013', u'\u2014', u'\u201d', u'\u201c'] ### don't include these when they are alone
             if thisToken not in uselessUnicode:
                 thisToken = thisToken.replace(u'\u201d','') # delete this (unicode quote)
@@ -61,15 +63,13 @@ def cleanTokens(tokenList):
     return textList
 
 def drop_pronouns(textList):
+    #print(textList)
     try:
         tags = tagger.tag(textList)
-
     except:
         print("%%%%%%\n!!!!!!!!!!!\nTAGGER FAILED\n!!!!!!!!!!!\n%%%%%%")
         print(textList)
-        print("%%%%%%\n!!!!!!!!!!!\nTAGGER FAILED\n!!!!!!!!!!!\n%%%%%%")
         return textList
-
     keep = []
     for i in range(0,len(textList)):
         if (tags[i][1] != 'PRP') & (tags[i][1] != 'PRP$'):
@@ -97,8 +97,7 @@ class lingualObject(object):
         self.tokens={}
 
         #Extract raw text and update for encoding issues            
-        #rawData=unicode(open(fileName).read(), "utf-8", errors="ignore")
-        rawData = open(fileName, encoding="utf-8", errors='ignore').read()
+        rawData=unicode(open(fileName).read(), "utf-8", errors="ignore")
 
         # tokenize and stem
         tokenList = rawToTokenList(rawData)
@@ -109,22 +108,30 @@ class lingualObject(object):
         self.tokens=cleanTokens(tokenList)
  
 
-    def getKeywords(self, wordCount, noPro = False):
+    def getKeywords(self, wordCount):
         startCount = 0
         # get all tokens for the fileName
+        #all_words = []
+        #for toke in self.tokens.values():
+        #    all_words = all_words + toke
         all_words = self.tokens
 
 
         ## create FreqDF with word frequencies from fileName
         freq = FreqDist(all_words) 
-        # convert it to a data frame
-        freqDF = pd.DataFrame.from_dict(freq, orient='index')
-        freqDF.columns = ['freq']
+        columns_obj = ["term", "freq"]
+        freqDF = pd.DataFrame(freq.items(), columns=columns_obj) # convert it to a data frame
+        #freqDF = freqDF.set_index('term')
+
+        ## drop the pronouns
+        terms = freqDF['term'].values.tolist()
         
-        if noPro == True:
-            terms = freqDF.index.tolist()
-            keepers = drop_pronouns(terms)
-            freqDF = freqDF.loc[keepers]
+        #if noPro = T:
+        	#keepers = drop_pronouns(terms[1:])
+        #else:
+        keepers = terms
+        freqDF = freqDF.set_index('term')
+        freqDF = freqDF.ix[keepers]
         
         ## merge freqDF with idf data frame
         freqit = freqDF.join(self.idf[['idf', 'logidf']])
@@ -151,24 +158,30 @@ class lingualObject(object):
 	    ##
         self.keywords = keywords
 
-    def wikitfidf(self, log = True, noPro = False):
+    def wikitfidf(self, log = True):
         startCount = 0
         # get all tokens for the fileName
+        #all_words = []
+        #for toke in self.tokens.values():
+        #    all_words = all_words + toke
         all_words = self.tokens
 
 
         ## create FreqDF with word frequencies from fileName
         freq = FreqDist(all_words) 
-
-        # convert it to a data frame
-        freqDF = pd.DataFrame.from_dict(freq, orient='index')
-        freqDF.columns = ['freq']
+        columns_obj = ["term", "freq"]
+        freqDF = pd.DataFrame(freq.items(), columns=columns_obj) # convert it to a data frame
+        #freqDF = freqDF.set_index('term')
 
         ## drop the pronouns
-        if noPro == True:
-            terms = freqDF.index.tolist()
-            keepers = drop_pronouns(terms)
-            freqDF = freqDF.loc[keepers]
+        terms = freqDF['term'].values.tolist()
+        
+        #if noPro = T:
+            #keepers = drop_pronouns(terms[1:])
+        #else:
+        keepers = terms
+        freqDF = freqDF.set_index('term')
+        freqDF = freqDF.ix[keepers]
         
         ## merge freqDF with idf data frame
         freqit = freqDF.join(self.idf[['idf', 'logidf']])
@@ -185,7 +198,17 @@ class lingualObject(object):
         ## order by tfidf weight
         freqit = freqit.sort_values(by='tfidf', ascending=False) 
 
-        # select raw IDF or log(IDF) for multiplier
+        '''
+        #filter out codecerror
+        keyslist = freqit.iloc[startCount:wordCount+startCount].index.tolist()
+        keywords = []
+        for word in keyslist:
+            if (word != 'codecerror') & (word != ''):
+                keywords = keywords + [word]
+
+        ##
+        self.keywords = keywords
+        '''
         if log == True:
             #print(freqit[['logidf']])
             return freqit[['logtfidf']]
@@ -198,7 +221,6 @@ def wikitdm(textDir, log = True, saveToCsv = True, printEach = True, noPro = Fal
 
     # clean out non .txt files
     filenames = [filename for filename in os.listdir(textDir) if ".txt" in filename]
-    
     # print number of files (and names)
     print(str(len(filenames)) + ' documents...')
     if printEach == True:
@@ -209,6 +231,7 @@ def wikitdm(textDir, log = True, saveToCsv = True, printEach = True, noPro = Fal
         # get the tfidf for that doc
         lo = lingualObject(textDir + '/' + filename)
         docdf = lo.wikitfidf(log = log, noPro = noPro)
+
         # rename column as filename
         try:
             docdf.rename(columns={'logtfidf':filename}, inplace=True)
@@ -222,27 +245,22 @@ def wikitdm(textDir, log = True, saveToCsv = True, printEach = True, noPro = Fal
         dflist.append(docdf)
     # concatenate all document df's into master df
     df = pd.concat(dflist, axis = 1)
+    # write to csv file
+    if saveToCsv == True:
+        df.to_csv(textDir + '-wikiTFIDF.csv', encoding='utf-8')
+
+        print('$$$$$$\nFULL TDM SAVED AS ' + textDir + '-wikiTFIDF.csv' + '\n$$$$$$')
+    #print(df)
     print('$$$$$$\nFINISHED! :: ' + str(df.shape[1]) + ' documents and ' + str(df.shape[0]) + ' terms\n$$$$$$')
-    # write to csv file
-    if saveToCsv == True:
-        df.to_csv(textDir + '-wikiTFIDF.csv', encoding='utf-8')
-        print('$$$$$$\nFULL TDM SAVED AS ' + textDir + '-wikiTFIDF.csv' + '\n$$$$$$')
-    #
     return df
 
-def wikidtm(textDir, log = True, saveToCsv = True, printEach = True, noPro = False):
-    df = wikitdm(textDir, log = log, printEach = printEach, noPro = noPro)
+def wikidtm(textDir, log = True, saveToCsv = True, noPro = False):
+    df = wikitdm(textDir, log = log, noPro = noPro)
     df = df.transpose()
-    print('$$$$$$\nFINISHED! :: ' + str(df.shape[0]) + ' documents and ' + str(df.shape[1]) + ' terms\n$$$$$$')
-    return df
     # write to csv file
     if saveToCsv == True:
         df.to_csv(textDir + '-wikiTFIDF.csv', encoding='utf-8')
         print('$$$$$$\nFULL TDM SAVED AS ' + textDir + '-wikiTFIDF.csv' + '\n$$$$$$')
     #
+    print('$$$$$$\nFINISHED! :: ' + str(df.shape[1]) + ' documents and ' + str(df.shape[0]) + ' terms\n$$$$$$')
     return df
-
-def wikiKeywords(filename, wordCount):
-    lo = lingualObject(filename)
-    lo.getKeywords(wordCount)
-    return lo.keywords
