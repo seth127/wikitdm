@@ -1,6 +1,14 @@
 # wikitdm
 a Python library for wiki-weighted TF-IDF and keyword analysis
 
+The purpose of this library is be able to extract the "important" keywords from documents, or to construct a Term Frequency-Inverse Document Frequency (TF-IDF) matrix with scores that reflect this notion of "importance." We are using the term "important" to mean the sense that those words are uniquely prevelant in a certain document, as compared to in general language use.
+
+The more conventional TF-IDF weights words by the frequency that they appear in documents *in the corpus being analyzed*, however in many cases this is not ideal. For example, this was conceived while analyzing religious texts and attempting to find the words which were most relevant to a particular tradition's religious discourse. In this case, those words would be in *a lot* of the documents in *our corpus* and therefore would be considered "common words" and weighted down accordingly. However, these words are rare in general language usage.
+
+This is solved by using Wikipedia as the IDF portion of the calculation. The entire dump of all of Wikipedia was downloaded (in February of 2016), and filtered to only articles containing at least 35,000 characters (in order to trim the corpus to a more manageable size, and to get rid of re-directs and disambiguations, etc.). This was then converted in a long, thin matrix with every term (stemmed and lower-cased) found in the corpus, and an IDF score indicating how many articles that term appeared in. Thus Wikipedia stands in as a proxy for "general usage" of English.
+
+By using this number of the TF-IDF calculation, you are weighting words based on their prevalance in the document, scaled by their prevalance in Wikipedia. In our experience, this gives a very useful measure of which words are uniquely important to each document.
+
 # Python version
 To run in Python 2.* use `import wikitdm2`
 

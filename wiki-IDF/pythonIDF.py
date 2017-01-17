@@ -1,6 +1,16 @@
 
 # coding: utf-8
 
+##################################################
+# THIS PROGRAM TAKES A FOLDER FULL OF .txt FILES #
+# AND CONVERTS IT TO A .csv WHICH CONTAINS IDF   #
+# COUNTS FOR EVERY TERM IN THAT "CORPUS"         #
+#                                                #
+# Beware: it is not particularly optimized and   #
+# can take a long time to run on any corpus      #
+# larger than a few hundred documents. A more    #
+# efficient version is in the works.             #
+##################################################
 
 # In[1]:
 
